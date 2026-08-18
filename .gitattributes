@@ -1,0 +1,2 @@
+# Prevent executables from being modified by Git and tells GitHub Linguist to treat it as generated
+bin/** binary linguist-generated
