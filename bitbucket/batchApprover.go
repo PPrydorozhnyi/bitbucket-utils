@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"strings"
 )
 
 const wUrl = "https://api.bitbucket.org/2.0/workspaces"
@@ -15,9 +14,18 @@ const wUrl = "https://api.bitbucket.org/2.0/workspaces"
 func Approve(u string) error {
 	fmt.Printf("Approving pull request for %s\n", u)
 
-	up, err := parseUrl(u)
+	up, err := parseURL(u)
 	if err != nil {
 		return err
+	}
+	for _, key := range up.UnknownParams {
+		fmt.Printf("Warning: unsupported query parameter %q was not applied\n", key)
+	}
+	if up.Mode != URLModeDashboard {
+		return fmt.Errorf("single pull request approval is not implemented yet")
+	}
+	if up.Filters.Author == "" {
+		return fmt.Errorf("dashboard URL without author parsed successfully; repository scan is not implemented yet")
 	}
 
 	prPath, err := buildPrUrl(up)
@@ -43,20 +51,20 @@ func Approve(u string) error {
 	return nil
 }
 
-func buildPrUrl(up *UrlParams) (string, error) {
+func buildPrUrl(up *URLParams) (string, error) {
 	u, err := url.Parse(wUrl)
 	if err != nil {
 		return "", err
 	}
 
-	u = u.JoinPath(up.WorkSpace, "pullrequests", up.Author)
+	u = u.JoinPath(up.Workspace, "pullrequests", up.Filters.Author)
 
 	q := u.Query()
 
 	f := `state="OPEN"`
 
-	if up.Title != "" {
-		f = fmt.Sprintf(`title~"%s" AND %s`, up.Title, f)
+	if up.Filters.Query != "" {
+		f = fmt.Sprintf(`title~"%s" AND %s`, up.Filters.Query, f)
 	}
 
 	q.Set("q", f)
@@ -64,33 +72,6 @@ func buildPrUrl(up *UrlParams) (string, error) {
 	u.RawQuery = q.Encode()
 	return u.String(), nil
 }
-
-func parseUrl(u string) (*UrlParams, error) {
-
-	parsed, err := url.Parse(u)
-	if err != nil {
-		return nil, err
-	}
-
-	q := parsed.Query()
-
-	a := q.Get("author")
-
-	if a == "" {
-		return nil, fmt.Errorf("no author query parameter found")
-	}
-
-	title := q.Get("query")
-
-	parsedPath := strings.Split(strings.Trim(parsed.Path, "/"), "/")
-
-	if len(parsedPath) < 2 {
-		return nil, fmt.Errorf("incorrect path %s", parsed.Path)
-	}
-
-	return &UrlParams{Author: a, WorkSpace: parsedPath[0], Title: title}, nil
-}
-
 func getCreds() (*Credentials, error) {
 	user := os.Getenv("BITBUCKET_USER")
 

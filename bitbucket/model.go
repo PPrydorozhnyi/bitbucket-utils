@@ -28,9 +28,3 @@ type Credentials struct {
 	User  string
 	Token string
 }
-
-type UrlParams struct {
-	WorkSpace string
-	Author    string
-	Title     string
-}
