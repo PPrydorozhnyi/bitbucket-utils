@@ -58,18 +58,7 @@ func buildPrUrl(up *URLParams) (string, error) {
 	}
 
 	u = u.JoinPath(up.Workspace, "pullrequests", up.Filters.Author)
-
-	q := u.Query()
-
-	f := `state="OPEN"`
-
-	if up.Filters.Query != "" {
-		f = fmt.Sprintf(`title~"%s" AND %s`, up.Filters.Query, f)
-	}
-
-	q.Set("q", f)
-
-	u.RawQuery = q.Encode()
+	u.RawQuery = buildPullRequestQuery(up.Filters, true).Encode()
 	return u.String(), nil
 }
 func getCreds() (*Credentials, error) {

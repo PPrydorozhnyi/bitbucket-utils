@@ -29,8 +29,18 @@ Recognized dashboard parameters:
 - `query`
 - `user_filter`: `ALL`, `AUTHOR`, `REVIEWING`, or `PARTICIPATING`
 - `reviewer`
+- `page`: positive API page number; omitted means first page
 
 `state` accepts encoded separators such as `OPEN%2BDRAFT`, literal separators such as `OPEN+DRAFT`, and repeated parameters. Missing state defaults to `OPEN`; missing `user_filter` defaults to `ALL`. Unknown parameters produce warnings.
+
+The API query builder:
+
+- requests 50 pull requests or 100 repositories per page
+- preserves `page` on pull-request list requests
+- combines classic states with `OR`
+- includes the OPEN draft-visibility clause when `DRAFT` or `QUEUED` is selected
+- adds project and escaped title predicates when applicable
+- omits the project predicate from per-repository PR queries after repositories were already project-filtered
 
 Parser accepts dashboard URLs without `author`, including project-scoped and workspace-wide forms. Repository scanning for those forms belongs to next implementation slice and currently stops before credentials or API calls. Single-PR execution is likewise not implemented yet. Existing author-based dashboard approval flow remains connected.
 

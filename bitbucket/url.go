@@ -20,6 +20,7 @@ const (
 var (
 	knownQueryParams = map[string]struct{}{
 		"author":      {},
+		"page":        {},
 		"project":     {},
 		"query":       {},
 		"reviewer":    {},
@@ -58,6 +59,7 @@ type DashboardFilters struct {
 	Query      string
 	UserFilter string
 	Reviewer   string
+	Page       int
 }
 
 func parseURL(raw string) (*URLParams, error) {
@@ -157,6 +159,10 @@ func parseDashboardQuery(rawQuery string) (DashboardFilters, []string, error) {
 	if err != nil {
 		return DashboardFilters{}, nil, err
 	}
+	pageValue, err := singleQueryValue(values, "page")
+	if err != nil {
+		return DashboardFilters{}, nil, err
+	}
 	userFilter, err := singleQueryValue(values, "user_filter")
 	if err != nil {
 		return DashboardFilters{}, nil, err
@@ -179,6 +185,14 @@ func parseDashboardQuery(rawQuery string) (DashboardFilters, []string, error) {
 		)
 	}
 
+	page := 0
+	if _, provided := values["page"]; provided {
+		page, err = strconv.Atoi(strings.TrimSpace(pageValue))
+		if err != nil || page <= 0 {
+			return DashboardFilters{}, nil, fmt.Errorf("query parameter %q must be a positive integer", "page")
+		}
+	}
+
 	var unknown []string
 	for _, key := range slices.Sorted(maps.Keys(values)) {
 		if _, ok := knownQueryParams[key]; !ok {
@@ -193,6 +207,7 @@ func parseDashboardQuery(rawQuery string) (DashboardFilters, []string, error) {
 		Query:      query,
 		UserFilter: userFilter,
 		Reviewer:   strings.TrimSpace(reviewer),
+		Page:       page,
 	}, unknown, nil
 }
 

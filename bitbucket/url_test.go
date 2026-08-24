@@ -21,7 +21,8 @@ func TestParseURLDashboard(t *testing.T) {
 				"&state=OPEN%2BDRAFT%2BQUEUED" +
 				"&user_filter=ALL" +
 				"&project=%7Ba747af2d-ade5-4e49-92c1-b6bc6480a16a%7D" +
-				"&query=jacoco",
+				"&query=jacoco" +
+				"&page=3",
 			want: &URLParams{
 				Mode:      URLModeDashboard,
 				Workspace: "delasport",
@@ -31,6 +32,7 @@ func TestParseURLDashboard(t *testing.T) {
 					Project:    "{a747af2d-ade5-4e49-92c1-b6bc6480a16a}",
 					Query:      "jacoco",
 					UserFilter: "ALL",
+					Page:       3,
 				},
 			},
 		},
@@ -167,6 +169,9 @@ func TestParseURLRejectsInvalidInput(t *testing.T) {
 		{name: "empty state", raw: "https://bitbucket.org/team/workspace/pull-requests/?state=", wantErr: `"state" must not be empty`},
 		{name: "unsupported state", raw: "https://bitbucket.org/team/workspace/pull-requests/?state=CLOSED", wantErr: `unsupported state "CLOSED"`},
 		{name: "unsupported user filter", raw: "https://bitbucket.org/team/workspace/pull-requests/?user_filter=MINE", wantErr: `unsupported user_filter "MINE"`},
+		{name: "empty page", raw: "https://bitbucket.org/team/workspace/pull-requests/?page=", wantErr: `"page" must be a positive integer`},
+		{name: "zero page", raw: "https://bitbucket.org/team/workspace/pull-requests/?page=0", wantErr: `"page" must be a positive integer`},
+		{name: "invalid page", raw: "https://bitbucket.org/team/workspace/pull-requests/?page=next", wantErr: `"page" must be a positive integer`},
 		{name: "duplicate singleton", raw: "https://bitbucket.org/team/workspace/pull-requests/?author=a&author=b", wantErr: `"author" must appear at most once`},
 		{name: "malformed query escape", raw: "https://bitbucket.org/team/workspace/pull-requests/?query=%zz", wantErr: "invalid URL escape"},
 	}
