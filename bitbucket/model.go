@@ -1,12 +1,5 @@
 package bitbucket
 
-type PrContainer struct {
-	Prs     []PullRequest `json:"values"`
-	Pagelen int           `json:"pagelen"`
-	Size    int           `json:"size"`
-	Page    int           `json:"page"`
-}
-
 type PullRequest struct {
 	Id    int    `json:"id"`
 	Title string `json:"title"`

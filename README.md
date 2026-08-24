@@ -42,6 +42,8 @@ The API query builder:
 - adds project and escaped title predicates when applicable
 - omits the project predicate from per-repository PR queries after repositories were already project-filtered
 
+The Bitbucket HTTP client uses a 30-second default timeout, request contexts, Basic authentication, bounded response bodies, and typed API errors containing HTTP status and Bitbucket's message. List calls follow every `next` link from the requested starting page. Pagination rejects repeated URLs and cross-origin links so credentials cannot leak to another host.
+
 Parser accepts dashboard URLs without `author`, including project-scoped and workspace-wide forms. Repository scanning for those forms belongs to next implementation slice and currently stops before credentials or API calls. Single-PR execution is likewise not implemented yet. Existing author-based dashboard approval flow remains connected.
 
 ## Development

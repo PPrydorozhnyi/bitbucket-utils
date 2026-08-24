@@ -1,9 +1,8 @@
 package bitbucket
 
 import (
-	"encoding/json"
+	"context"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"os"
@@ -12,6 +11,10 @@ import (
 const wUrl = "https://api.bitbucket.org/2.0/workspaces"
 
 func Approve(u string) error {
+	return approve(context.Background(), u)
+}
+
+func approve(ctx context.Context, u string) error {
 	fmt.Printf("Approving pull request for %s\n", u)
 
 	up, err := parseURL(u)
@@ -37,13 +40,14 @@ func Approve(u string) error {
 	if err != nil {
 		return err
 	}
+	apiClient := newClient(nil, *creds)
 
-	al, err := getPrsToApprove(prPath, creds)
+	al, err := getPRsToApprove(ctx, apiClient, prPath)
 	if err != nil {
 		return err
 	}
 
-	err = approveAll(al, creds)
+	err = approveAll(ctx, apiClient, al)
 	if err != nil {
 		return err
 	}
@@ -77,59 +81,17 @@ func getCreds() (*Credentials, error) {
 	return &Credentials{User: user, Token: token}, nil
 }
 
-func getPrsToApprove(url string, creds *Credentials) ([]PullRequest, error) {
-	newData, err := executeRequest(url, http.MethodGet, creds)
-	if err != nil {
-		return nil, err
-	}
-
-	var parsed PrContainer
-	err = json.Unmarshal(newData, &parsed)
-	if err != nil {
-		return nil, err
-	}
-
-	return parsed.Prs, nil
+func getPRsToApprove(
+	ctx context.Context,
+	apiClient *client,
+	url string,
+) ([]PullRequest, error) {
+	return getAllPages[PullRequest](ctx, apiClient, url)
 }
 
-func executeRequest(url string, method string, creds *Credentials) ([]byte, error) {
-	req, err := http.NewRequest(method, url, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	req.SetBasicAuth(creds.User, creds.Token)
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-
-	defer func(Body io.ReadCloser) {
-		e := Body.Close()
-		if err != nil {
-			fmt.Printf("failed to close response body for %s %v", url, e)
-		}
-	}(resp.Body)
-
-	newData, err := io.ReadAll(resp.Body)
-
-	if err != nil {
-		return nil, err
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("unexpected status code: %d for %s. response is %s", resp.StatusCode, url, string(newData))
-	}
-
-	return newData, nil
-}
-
-func approveAll(prs []PullRequest, creds *Credentials) error {
-
+func approveAll(ctx context.Context, apiClient *client, prs []PullRequest) error {
 	for _, pr := range prs {
-		_, err := executeRequest(pr.Links.Approve.Href, http.MethodPost, creds)
-		if err != nil {
+		if err := apiClient.doJSON(ctx, http.MethodPost, pr.Links.Approve.Href, nil); err != nil {
 			return err
 		}
 		fmt.Printf("Approved pull request: %s. Check it out: %s\n", pr.Title, pr.Links.Html.Href)

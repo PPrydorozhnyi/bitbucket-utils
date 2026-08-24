@@ -13,7 +13,7 @@ const (
 
 	pullRequestFields = "next," +
 		"values.id,values.title,values.state,values.draft,values.queued," +
-		"values.links.html.href,values.destination.repository.slug," +
+		"values.links.html.href,values.links.approve.href,values.destination.repository.slug," +
 		"values.destination.repository.full_name,values.destination.repository.project.uuid," +
 		"values.reviewers.account_id,values.reviewers.uuid," +
 		"values.participants.user.account_id,values.participants.user.uuid," +
