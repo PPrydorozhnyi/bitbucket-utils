@@ -9,7 +9,7 @@ export BITBUCKET_USER='you@example.com'
 export BITBUCKET_TOKEN='your-api-token'
 
 go run ./cmd --approve-pr \
-  'https://bitbucket.org/delasport/workspace/pull-requests/?author=712020%3A47ee3e5f-1b5c-4616-9f46-77e67b1894cf&state=OPEN%2BDRAFT%2BQUEUED&user_filter=ALL&project=%7Ba747af2d-ade5-4e49-92c1-b6bc6480a16a%7D&query=jacoco'
+  'https://bitbucket.org/sport/workspace/pull-requests/?author=712020%3A47ee3e5f-1b5c-4616-9f46-77e67b1894cf&state=OPEN%2BDRAFT%2BQUEUED&user_filter=ALL&project=%7Ba747af2d-ade5-4e49-92c1-b6bc6480a16a%7D&query=jacoco'
 ```
 
 Use an Atlassian API token. Bitbucket app passwords were disabled on June 9, 2026.

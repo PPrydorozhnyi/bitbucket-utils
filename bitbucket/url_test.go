@@ -16,7 +16,7 @@ func TestParseURLDashboard(t *testing.T) {
 	}{
 		{
 			name: "full dashboard URL",
-			raw: "https://bitbucket.org/delasport/workspace/pull-requests/?" +
+			raw: "https://bitbucket.org/sport/workspace/pull-requests/?" +
 				"author=712020%3A47ee3e5f-1b5c-4616-9f46-77e67b1894cf" +
 				"&state=OPEN%2BDRAFT%2BQUEUED" +
 				"&user_filter=ALL" +
@@ -25,7 +25,7 @@ func TestParseURLDashboard(t *testing.T) {
 				"&page=3",
 			want: &URLParams{
 				Mode:      URLModeDashboard,
-				Workspace: "delasport",
+				Workspace: "sport",
 				Filters: DashboardFilters{
 					Author:     "712020:47ee3e5f-1b5c-4616-9f46-77e67b1894cf",
 					States:     []string{"OPEN", "DRAFT", "QUEUED"},
@@ -133,7 +133,7 @@ func TestParseURLSinglePR(t *testing.T) {
 	t.Parallel()
 
 	got, err := parseURL(
-		"https://BITBUCKET.ORG/delasport/repository-name/pull-requests/42/?ignored=1",
+		"https://BITBUCKET.ORG/sport/repository-name/pull-requests/42/?ignored=1",
 	)
 	if err != nil {
 		t.Fatalf("parseURL() error = %v", err)
@@ -141,7 +141,7 @@ func TestParseURLSinglePR(t *testing.T) {
 
 	want := &URLParams{
 		Mode:          URLModeSinglePR,
-		Workspace:     "delasport",
+		Workspace:     "sport",
 		Repository:    "repository-name",
 		PullRequestID: 42,
 	}
