@@ -1,0 +1,53 @@
+name: Build cross-platform binaries
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - 'build/**'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-binaries-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+          cache-dependency-path: go.mod
+
+      - name: Build binaries
+        env:
+          CGO_ENABLED: '0'
+        run: |
+          mkdir -p build
+          GOOS=darwin GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o build/console-utils-darwin-amd64 ./cmd
+          GOOS=darwin GOARCH=arm64 go build -trimpath -ldflags="-s -w" -o build/console-utils-darwin-arm64 ./cmd
+          GOOS=windows GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o build/console-utils-windows-amd64.exe ./cmd
+
+      - name: Commit changed binaries
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- build/
+          if git diff --cached --quiet; then
+            echo "Binaries are already up to date."
+            exit 0
+          fi
+          git commit -m "build cross-platform binaries [skip ci]"
+          git push

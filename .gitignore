@@ -36,6 +36,7 @@ fabric.properties
 *.dll
 *.so
 *.dylib
+!build/*.exe
 
 # Test binary, built with `go test -c`
 *.test
