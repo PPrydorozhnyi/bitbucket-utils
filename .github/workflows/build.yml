@@ -31,6 +31,9 @@ jobs:
           cache: true
           cache-dependency-path: go.mod
 
+      - name: Run tests
+        run: go test ./...
+
       - name: Build binaries
         env:
           CGO_ENABLED: '0'
