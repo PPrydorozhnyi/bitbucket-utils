@@ -9,9 +9,7 @@ import (
 
 const (
 	pullRequestPageLength = 50
-	repositoryPageLength  = 100
-
-	pullRequestFields = "next," +
+	pullRequestFields     = "next," +
 		"values.id,values.title,values.state,values.draft,values.queued," +
 		"values.links.html.href,values.links.approve.href,values.destination.repository.slug," +
 		"values.destination.repository.full_name,values.destination.repository.project.uuid," +
@@ -19,10 +17,21 @@ const (
 		"values.participants.user.account_id,values.participants.user.uuid," +
 		"values.participants.approved,values.author.account_id,values.author.uuid," +
 		"values.description"
-	repositoryFields = "next,values.slug,values.full_name,values.project.uuid"
 )
 
-func buildPullRequestQuery(filters DashboardFilters, includeProject bool) url.Values {
+type pullRequestQueryOptions struct {
+	IncludeProject         bool
+	ExcludeAuthorAccountID string
+}
+
+func buildDashboardPullRequestQuery(filters DashboardFilters, currentUser User) url.Values {
+	return buildPullRequestQuery(filters, pullRequestQueryOptions{
+		IncludeProject:         true,
+		ExcludeAuthorAccountID: currentUser.AccountID,
+	})
+}
+
+func buildPullRequestQuery(filters DashboardFilters, options pullRequestQueryOptions) url.Values {
 	query := url.Values{
 		"fields":  {pullRequestFields},
 		"pagelen": {strconv.Itoa(pullRequestPageLength)},
@@ -30,32 +39,18 @@ func buildPullRequestQuery(filters DashboardFilters, includeProject bool) url.Va
 	if filters.Page > 0 {
 		query.Set("page", strconv.Itoa(filters.Page))
 	}
-	if filter := buildPullRequestFilter(filters, includeProject); filter != "" {
+	if filter := buildPullRequestFilter(filters, options); filter != "" {
 		query.Set("q", filter)
 	}
 	return query
 }
 
-func buildRepositoryQuery(project string, page int) url.Values {
-	query := url.Values{
-		"fields":  {repositoryFields},
-		"pagelen": {strconv.Itoa(repositoryPageLength)},
-	}
-	if page > 0 {
-		query.Set("page", strconv.Itoa(page))
-	}
-	if project = strings.TrimSpace(project); project != "" {
-		query.Set("q", "project.uuid = "+quoteQueryValue(project))
-	}
-	return query
-}
-
-func buildPullRequestFilter(filters DashboardFilters, includeProject bool) string {
-	clauses := make([]string, 0, 3)
+func buildPullRequestFilter(filters DashboardFilters, options pullRequestQueryOptions) string {
+	clauses := make([]string, 0, 4)
 	if state := buildStateFilter(filters.States); state != "" {
 		clauses = append(clauses, state)
 	}
-	if includeProject && filters.Project != "" {
+	if options.IncludeProject && filters.Project != "" {
 		clauses = append(
 			clauses,
 			"destination.repository.project.uuid = "+quoteQueryValue(filters.Project),
@@ -63,6 +58,12 @@ func buildPullRequestFilter(filters DashboardFilters, includeProject bool) strin
 	}
 	if filters.Query != "" {
 		clauses = append(clauses, "title ~ "+quoteQueryValue(filters.Query))
+	}
+	if options.ExcludeAuthorAccountID != "" {
+		clauses = append(
+			clauses,
+			"author.account_id != "+quoteQueryValue(options.ExcludeAuthorAccountID),
+		)
 	}
 	return strings.Join(clauses, " AND ")
 }
@@ -104,6 +105,18 @@ func buildStateFilter(states []string) string {
 	default:
 		return "(" + strings.Join(clauses, " OR ") + ")"
 	}
+}
+
+func filterApprovablePRs(prs []PullRequest, currentUser User) []PullRequest {
+	return slices.DeleteFunc(slices.Clone(prs), func(pr PullRequest) bool {
+		if pr.Author.AccountID == currentUser.AccountID {
+			return true
+		}
+		return slices.ContainsFunc(pr.Participants, func(participant Participant) bool {
+			return participant.Approved &&
+				participant.User.AccountID == currentUser.AccountID
+		})
+	})
 }
 
 func quoteQueryValue(value string) string {

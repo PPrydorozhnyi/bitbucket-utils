@@ -1,10 +1,17 @@
 package bitbucket
 
 type PullRequest struct {
-	Id    int    `json:"id"`
-	Title string `json:"title"`
-	State string `json:"state"`
-	Links Links  `json:"links"`
+	Id           int           `json:"id"`
+	Title        string        `json:"title"`
+	State        string        `json:"state"`
+	Author       User          `json:"author"`
+	Participants []Participant `json:"participants"`
+	Links        Links         `json:"links"`
+}
+
+type Participant struct {
+	User     User `json:"user"`
+	Approved bool `json:"approved"`
 }
 
 type Links struct {
@@ -20,4 +27,8 @@ type Link struct {
 type Credentials struct {
 	User  string
 	Token string
+}
+
+type User struct {
+	AccountID string `json:"account_id"`
 }

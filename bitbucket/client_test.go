@@ -46,7 +46,7 @@ func TestGetAllPages(t *testing.T) {
 	}))
 	defer server.Close()
 
-	apiClient := newClient(server.Client(), Credentials{
+	apiClient := newClient(server.Client(), &Credentials{
 		User:  "user@example.com",
 		Token: "secret",
 	})
@@ -78,7 +78,7 @@ func TestClientReturnsTypedAPIError(t *testing.T) {
 	}))
 	defer server.Close()
 
-	apiClient := newClient(server.Client(), Credentials{})
+	apiClient := newClient(server.Client(), &Credentials{})
 	err := apiClient.doJSON(t.Context(), http.MethodGet, server.URL+"/resource", new(any))
 	if err == nil {
 		t.Fatal("doJSON() error = nil")
@@ -107,7 +107,7 @@ func TestClientReportsInvalidJSON(t *testing.T) {
 	}))
 	defer server.Close()
 
-	apiClient := newClient(server.Client(), Credentials{})
+	apiClient := newClient(server.Client(), &Credentials{})
 	err := apiClient.doJSON(t.Context(), http.MethodGet, server.URL, new(apiPage[PullRequest]))
 	if err == nil {
 		t.Fatal("doJSON() error = nil")
@@ -128,7 +128,7 @@ func TestClientAcceptsEmptySuccessfulPOST(t *testing.T) {
 	}))
 	defer server.Close()
 
-	apiClient := newClient(server.Client(), Credentials{})
+	apiClient := newClient(server.Client(), &Credentials{})
 	if err := apiClient.doJSON(t.Context(), http.MethodPost, server.URL, nil); err != nil {
 		t.Fatalf("doJSON() error = %v", err)
 	}
@@ -142,7 +142,7 @@ func TestGetAllPagesRejectsOriginChange(t *testing.T) {
 	}))
 	defer server.Close()
 
-	apiClient := newClient(server.Client(), Credentials{})
+	apiClient := newClient(server.Client(), &Credentials{})
 	_, err := getAllPages[PullRequest](t.Context(), apiClient, server.URL)
 	if err == nil {
 		t.Fatal("getAllPages() error = nil")
@@ -161,7 +161,7 @@ func TestGetAllPagesRejectsCycle(t *testing.T) {
 	}))
 	defer server.Close()
 
-	apiClient := newClient(server.Client(), Credentials{})
+	apiClient := newClient(server.Client(), &Credentials{})
 	_, err := getAllPages[PullRequest](t.Context(), apiClient, server.URL)
 	if err == nil {
 		t.Fatal("getAllPages() error = nil")
@@ -177,7 +177,7 @@ func TestClientPreservesContextCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 
-	apiClient := newClient(&http.Client{}, Credentials{})
+	apiClient := newClient(&http.Client{}, &Credentials{})
 	err := apiClient.doJSON(ctx, http.MethodGet, "https://example.com", new(any))
 	if err == nil {
 		t.Fatal("doJSON() error = nil")

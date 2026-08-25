@@ -2,6 +2,7 @@ package bitbucket
 
 import (
 	"net/url"
+	"reflect"
 	"testing"
 )
 
@@ -13,11 +14,7 @@ func TestBuildStateFilter(t *testing.T) {
 		states []string
 		want   string
 	}{
-		{
-			name:   "open",
-			states: []string{"OPEN"},
-			want:   `state = "OPEN"`,
-		},
+		{name: "open", states: []string{"OPEN"}, want: `state = "OPEN"`},
 		{
 			name:   "draft includes open and draft visibility clause",
 			states: []string{"DRAFT"},
@@ -43,16 +40,12 @@ func TestBuildStateFilter(t *testing.T) {
 			states: []string{"DRAFT", "MERGED"},
 			want:   `((state = "OPEN" AND (draft = true OR draft = false)) OR state = "MERGED")`,
 		},
-		{
-			name: "empty",
-			want: "",
-		},
+		{name: "empty", want: ""},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-
 			if got := buildStateFilter(tt.states); got != tt.want {
 				t.Errorf("buildStateFilter() = %q, want %q", got, tt.want)
 			}
@@ -68,16 +61,19 @@ func TestBuildPullRequestFilter(t *testing.T) {
 		Project: "{project-uuid}",
 		Query:   `say "hi" \ path`,
 	}
-
-	got := buildPullRequestFilter(filters, true)
+	got := buildPullRequestFilter(filters, pullRequestQueryOptions{
+		IncludeProject:         true,
+		ExcludeAuthorAccountID: "current-user",
+	})
 	want := `(state = "OPEN" AND (draft = true OR draft = false))` +
 		` AND destination.repository.project.uuid = "{project-uuid}"` +
-		` AND title ~ "say \"hi\" \\ path"`
+		` AND title ~ "say \"hi\" \\ path"` +
+		` AND author.account_id != "current-user"`
 	if got != want {
 		t.Errorf("buildPullRequestFilter() = %q, want %q", got, want)
 	}
 
-	got = buildPullRequestFilter(filters, false)
+	got = buildPullRequestFilter(filters, pullRequestQueryOptions{})
 	want = `(state = "OPEN" AND (draft = true OR draft = false))` +
 		` AND title ~ "say \"hi\" \\ path"`
 	if got != want {
@@ -85,15 +81,15 @@ func TestBuildPullRequestFilter(t *testing.T) {
 	}
 }
 
-func TestBuildPullRequestQuery(t *testing.T) {
+func TestBuildDashboardPullRequestQuery(t *testing.T) {
 	t.Parallel()
 
-	got := buildPullRequestQuery(DashboardFilters{
+	got := buildDashboardPullRequestQuery(DashboardFilters{
 		States:  []string{"OPEN"},
 		Project: "{project-uuid}",
 		Query:   "jacoco",
 		Page:    3,
-	}, true)
+	}, User{AccountID: "current-user"})
 
 	assertQueryValue(t, got, "pagelen", "50")
 	assertQueryValue(t, got, "page", "3")
@@ -102,29 +98,12 @@ func TestBuildPullRequestQuery(t *testing.T) {
 		t,
 		got,
 		"q",
-		`state = "OPEN" AND destination.repository.project.uuid = "{project-uuid}" AND title ~ "jacoco"`,
+		`state = "OPEN" AND destination.repository.project.uuid = "{project-uuid}"`+
+			` AND title ~ "jacoco" AND author.account_id != "current-user"`,
 	)
 }
 
-func TestBuildRepositoryQuery(t *testing.T) {
-	t.Parallel()
-
-	got := buildRepositoryQuery("{project-uuid}", 4)
-	assertQueryValue(t, got, "pagelen", "100")
-	assertQueryValue(t, got, "page", "4")
-	assertQueryValue(t, got, "fields", repositoryFields)
-	assertQueryValue(t, got, "q", `project.uuid = "{project-uuid}"`)
-
-	got = buildRepositoryQuery("", 0)
-	if got.Has("page") {
-		t.Errorf("buildRepositoryQuery() page = %q, want omitted", got.Get("page"))
-	}
-	if got.Has("q") {
-		t.Errorf("buildRepositoryQuery() q = %q, want omitted", got.Get("q"))
-	}
-}
-
-func TestBuildPrURLUsesParsedFiltersAndPage(t *testing.T) {
+func TestBuildPullRequestsByAuthorURL(t *testing.T) {
 	t.Parallel()
 
 	input, err := parseURL(
@@ -135,17 +114,16 @@ func TestBuildPrURLUsesParsedFiltersAndPage(t *testing.T) {
 		t.Fatalf("parseURL() error = %v", err)
 	}
 
-	raw, err := buildPrUrl(input)
+	raw, err := buildPullRequestsByAuthorURL(input, User{AccountID: "current-user"})
 	if err != nil {
-		t.Fatalf("buildPrUrl() error = %v", err)
+		t.Fatalf("buildPullRequestsByAuthorURL() error = %v", err)
 	}
 	parsed, err := url.Parse(raw)
 	if err != nil {
 		t.Fatalf("url.Parse() error = %v", err)
 	}
-
 	if parsed.Path != "/2.0/workspaces/team/pullrequests/user-id" {
-		t.Errorf("buildPrUrl() path = %q", parsed.Path)
+		t.Errorf("buildPullRequestsByAuthorURL() path = %q", parsed.Path)
 	}
 	assertQueryValue(t, parsed.Query(), "page", "2")
 	assertQueryValue(
@@ -154,8 +132,45 @@ func TestBuildPrURLUsesParsedFiltersAndPage(t *testing.T) {
 		"q",
 		`(state = "OPEN" AND (draft = true OR draft = false))`+
 			` AND destination.repository.project.uuid = "{project-uuid}"`+
-			` AND title ~ "jacoco"`,
+			` AND title ~ "jacoco"`+
+			` AND author.account_id != "current-user"`,
 	)
+}
+
+func TestFilterApprovablePRs(t *testing.T) {
+	t.Parallel()
+
+	currentUser := User{AccountID: "current-user"}
+	prs := []PullRequest{
+		{Id: 1, Author: currentUser},
+		{
+			Id:           2,
+			Author:       User{AccountID: "other"},
+			Participants: []Participant{{User: currentUser, Approved: true}},
+		},
+		{
+			Id:           3,
+			Author:       User{AccountID: "other"},
+			Participants: []Participant{{User: currentUser}},
+		},
+		{
+			Id:     4,
+			Author: User{AccountID: "other"},
+			Participants: []Participant{{
+				User:     User{AccountID: "another-user"},
+				Approved: true,
+			}},
+		},
+	}
+
+	got := filterApprovablePRs(prs, currentUser)
+	want := []PullRequest{prs[2], prs[3]}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("filterApprovablePRs() = %#v, want %#v", got, want)
+	}
+	if len(prs) != 4 {
+		t.Errorf("filterApprovablePRs() mutated input length to %d", len(prs))
+	}
 }
 
 func assertQueryValue(t *testing.T, query url.Values, key, want string) {

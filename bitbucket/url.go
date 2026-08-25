@@ -15,6 +15,10 @@ type URLMode string
 const (
 	URLModeDashboard URLMode = "dashboard"
 	URLModeSinglePR  URLMode = "single_pr"
+
+	workspacesAPIURL   = "https://api.bitbucket.org/2.0/workspaces"
+	repositoriesAPIURL = "https://api.bitbucket.org/2.0/repositories"
+	currentUserURL     = "https://api.bitbucket.org/2.0/user?fields=account_id"
 )
 
 var (
@@ -175,7 +179,7 @@ func parseDashboardQuery(rawQuery string) (DashboardFilters, []string, error) {
 
 	userFilter = strings.ToUpper(strings.TrimSpace(userFilter))
 	if userFilter == "" {
-		userFilter = "ALL"
+		userFilter = "REVIEWING"
 	}
 	if !slices.Contains(validUserFilters, userFilter) {
 		return DashboardFilters{}, nil, fmt.Errorf(
@@ -254,4 +258,42 @@ func parseStates(values []string) ([]string, error) {
 	}
 
 	return states, nil
+}
+
+func buildPullRequestsByAuthorURL(input *URLParams, currentUser User) (string, error) {
+	u, err := url.Parse(workspacesAPIURL)
+	if err != nil {
+		return "", err
+	}
+
+	u = u.JoinPath(input.Workspace, "pullrequests", input.Filters.Author)
+	u.RawQuery = buildDashboardPullRequestQuery(input.Filters, currentUser).Encode()
+	return u.String(), nil
+}
+
+func buildWorkspaceRepositoriesURL(workspace, project string, page int) (string, error) {
+	u, err := url.Parse(repositoriesAPIURL)
+	if err != nil {
+		return "", err
+	}
+
+	u = u.JoinPath(workspace)
+	u.RawQuery = buildRepositoryQuery(project, page).Encode()
+	return u.String(), nil
+}
+
+func buildRepositoryPullRequestsURL(
+	workspace string,
+	repository string,
+	filters DashboardFilters,
+	currentUser User,
+) (string, error) {
+	u, err := url.Parse(repositoriesAPIURL)
+	if err != nil {
+		return "", err
+	}
+
+	u = u.JoinPath(workspace, repository, "pullrequests")
+	u.RawQuery = buildRepositoryPullRequestQuery(filters, currentUser).Encode()
+	return u.String(), nil
 }

@@ -31,7 +31,7 @@ Recognized dashboard parameters:
 - `reviewer`
 - `page`: positive API page number; omitted means first page
 
-`state` accepts encoded separators such as `OPEN%2BDRAFT`, literal separators such as `OPEN+DRAFT`, and repeated parameters. Missing state defaults to `OPEN`; missing `user_filter` defaults to `ALL`. Unknown parameters produce warnings.
+`state` accepts encoded separators such as `OPEN%2BDRAFT`, literal separators such as `OPEN+DRAFT`, and repeated parameters. Missing state defaults to `OPEN`; missing `user_filter` defaults to `REVIEWING`. Unknown parameters produce warnings.
 
 The API query builder:
 
@@ -40,9 +40,12 @@ The API query builder:
 - combines classic states with `OR`
 - includes the OPEN draft-visibility clause when `DRAFT` or `QUEUED` is selected
 - adds project and escaped title predicates when applicable
+- excludes pull requests authored by the authenticated account
 - omits the project predicate from per-repository PR queries after repositories were already project-filtered
 
 The Bitbucket HTTP client uses a 30-second default timeout, request contexts, Basic authentication, bounded response bodies, and typed API errors containing HTTP status and Bitbucket's message. List calls follow every `next` link from the requested starting page. Pagination rejects repeated URLs and cross-origin links so credentials cannot leak to another host.
+
+Bitbucket query syntax cannot reliably express “no approved participant matching this account” across the `participants` array. The command therefore requests participant approval fields and removes both own PRs and already-approved PRs client-side before posting approvals. Repository-list and per-repository PR URL builders are ready for the no-author scan flow.
 
 Parser accepts dashboard URLs without `author`, including project-scoped and workspace-wide forms. Repository scanning for those forms belongs to next implementation slice and currently stops before credentials or API calls. Single-PR execution is likewise not implemented yet. Existing author-based dashboard approval flow remains connected.
 

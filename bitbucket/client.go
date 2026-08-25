@@ -23,7 +23,7 @@ const (
 
 type client struct {
 	httpClient  *http.Client
-	credentials Credentials
+	credentials *Credentials
 }
 
 type APIError struct {
@@ -48,7 +48,7 @@ type apiPage[T any] struct {
 	Size   int    `json:"size"`
 }
 
-func newClient(httpClient *http.Client, credentials Credentials) *client {
+func newClient(httpClient *http.Client, credentials *Credentials) *client {
 	if httpClient == nil {
 		httpClient = &http.Client{Timeout: defaultHTTPTimeout}
 	}
@@ -105,6 +105,14 @@ func (c *client) doJSON(
 		return fmt.Errorf("%s %s: decode Bitbucket response: %w", method, rawURL, err)
 	}
 	return nil
+}
+
+func getSingle[T any](ctx context.Context, client *client, url string) (*T, error) {
+	var result T
+	if err := client.doJSON(ctx, http.MethodGet, url, &result); err != nil {
+		return nil, fmt.Errorf("fetch Bitbucket single: %w", err)
+	}
+	return &result, nil
 }
 
 func getAllPages[T any](

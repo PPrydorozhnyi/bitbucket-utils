@@ -4,11 +4,8 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"net/url"
 	"os"
 )
-
-const wUrl = "https://api.bitbucket.org/2.0/workspaces"
 
 func Approve(u string) error {
 	return approve(context.Background(), u)
@@ -31,21 +28,30 @@ func approve(ctx context.Context, u string) error {
 		return fmt.Errorf("dashboard URL without author parsed successfully; repository scan is not implemented yet")
 	}
 
-	prPath, err := buildPrUrl(up)
-	if err != nil {
-		return err
-	}
-
 	creds, err := getCreds()
 	if err != nil {
 		return err
 	}
-	apiClient := newClient(nil, *creds)
+	apiClient := newClient(nil, creds)
+
+	cu, err := getSingle[User](ctx, apiClient, currentUserURL)
+	if err != nil {
+		return err
+	}
+	if cu.AccountID == "" {
+		return fmt.Errorf("current Bitbucket user response has no account_id")
+	}
+
+	prPath, err := buildPullRequestsByAuthorURL(up, *cu)
+	if err != nil {
+		return err
+	}
 
 	al, err := getPRsToApprove(ctx, apiClient, prPath)
 	if err != nil {
 		return err
 	}
+	al = filterApprovablePRs(al, *cu)
 
 	err = approveAll(ctx, apiClient, al)
 	if err != nil {
@@ -55,16 +61,6 @@ func approve(ctx context.Context, u string) error {
 	return nil
 }
 
-func buildPrUrl(up *URLParams) (string, error) {
-	u, err := url.Parse(wUrl)
-	if err != nil {
-		return "", err
-	}
-
-	u = u.JoinPath(up.Workspace, "pullrequests", up.Filters.Author)
-	u.RawQuery = buildPullRequestQuery(up.Filters, true).Encode()
-	return u.String(), nil
-}
 func getCreds() (*Credentials, error) {
 	user := os.Getenv("BITBUCKET_USER")
 

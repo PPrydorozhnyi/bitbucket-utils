@@ -45,7 +45,7 @@ func TestParseURLDashboard(t *testing.T) {
 				Filters: DashboardFilters{
 					States:     []string{"OPEN"},
 					Project:    "{project-uuid}",
-					UserFilter: "ALL",
+					UserFilter: "REVIEWING",
 				},
 			},
 		},
@@ -57,7 +57,7 @@ func TestParseURLDashboard(t *testing.T) {
 				Workspace: "team",
 				Filters: DashboardFilters{
 					States:     []string{"OPEN"},
-					UserFilter: "ALL",
+					UserFilter: "REVIEWING",
 				},
 			},
 		},
@@ -69,7 +69,7 @@ func TestParseURLDashboard(t *testing.T) {
 				Workspace: "team",
 				Filters: DashboardFilters{
 					States:     []string{"OPEN", "DRAFT", "QUEUED"},
-					UserFilter: "ALL",
+					UserFilter: "REVIEWING",
 				},
 			},
 		},
@@ -81,7 +81,7 @@ func TestParseURLDashboard(t *testing.T) {
 				Workspace: "team",
 				Filters: DashboardFilters{
 					States:     []string{"OPEN", "DRAFT", "MERGED"},
-					UserFilter: "ALL",
+					UserFilter: "REVIEWING",
 				},
 			},
 		},
@@ -107,7 +107,7 @@ func TestParseURLDashboard(t *testing.T) {
 				Workspace: "team",
 				Filters: DashboardFilters{
 					States:     []string{"OPEN"},
-					UserFilter: "ALL",
+					UserFilter: "REVIEWING",
 				},
 				UnknownParams: []string{"a", "z"},
 			},
