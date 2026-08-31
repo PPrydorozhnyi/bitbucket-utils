@@ -44,8 +44,6 @@ func (e *APIError) Error() string {
 type apiPage[T any] struct {
 	Values []T    `json:"values"`
 	Next   string `json:"next"`
-	Page   int    `json:"page"`
-	Size   int    `json:"size"`
 }
 
 func newClient(httpClient *http.Client, credentials *Credentials) *client {

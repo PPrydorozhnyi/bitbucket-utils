@@ -18,7 +18,12 @@ const (
 
 	workspacesAPIURL   = "https://api.bitbucket.org/2.0/workspaces"
 	repositoriesAPIURL = "https://api.bitbucket.org/2.0/repositories"
-	currentUserURL     = "https://api.bitbucket.org/2.0/user?fields=account_id"
+	currentUserURL     = "https://api.bitbucket.org/2.0/user?fields=account_id%2Cuuid"
+	singlePRFields     = "id,title,state,draft,queued,links.html.href," +
+		"destination.repository.slug,destination.repository.full_name," +
+		"destination.repository.project.uuid,reviewers.account_id,reviewers.uuid," +
+		"participants.user.account_id,participants.user.uuid,participants.approved," +
+		"author.account_id,author.uuid,description"
 )
 
 var (
@@ -261,13 +266,24 @@ func parseStates(values []string) ([]string, error) {
 }
 
 func buildPullRequestsByAuthorURL(input *URLParams, currentUser User) (string, error) {
+	return buildPullRequestsByAuthorURLWithProject(input, currentUser, true)
+}
+
+func buildPullRequestsByAuthorURLWithProject(
+	input *URLParams,
+	currentUser User,
+	includeProject bool,
+) (string, error) {
 	u, err := url.Parse(workspacesAPIURL)
 	if err != nil {
 		return "", err
 	}
 
 	u = u.JoinPath(input.Workspace, "pullrequests", input.Filters.Author)
-	u.RawQuery = buildDashboardPullRequestQuery(input.Filters, currentUser).Encode()
+	u.RawQuery = buildPullRequestQuery(input.Filters, pullRequestQueryOptions{
+		IncludeProject:         includeProject,
+		ExcludeAuthorAccountID: currentUser.AccountID,
+	}).Encode()
 	return u.String(), nil
 }
 
@@ -296,4 +312,45 @@ func buildRepositoryPullRequestsURL(
 	u = u.JoinPath(workspace, repository, "pullrequests")
 	u.RawQuery = buildRepositoryPullRequestQuery(filters, currentUser).Encode()
 	return u.String(), nil
+}
+
+func buildSinglePullRequestURL(input *URLParams) (string, error) {
+	u, err := url.Parse(repositoriesAPIURL)
+	if err != nil {
+		return "", err
+	}
+
+	u = u.JoinPath(
+		input.Workspace,
+		input.Repository,
+		"pullrequests",
+		strconv.Itoa(input.PullRequestID),
+	)
+	u.RawQuery = url.Values{"fields": {singlePRFields}}.Encode()
+	return u.String(), nil
+}
+
+func buildPullRequestApprovalURL(workspace, repository string, pullRequestID int) (string, error) {
+	if strings.TrimSpace(workspace) == "" {
+		return "", fmt.Errorf("workspace is required")
+	}
+	if strings.TrimSpace(repository) == "" {
+		return "", fmt.Errorf("repository is required")
+	}
+	if pullRequestID <= 0 {
+		return "", fmt.Errorf("pull request ID must be positive")
+	}
+
+	u, err := url.Parse(repositoriesAPIURL)
+	if err != nil {
+		return "", err
+	}
+
+	return u.JoinPath(
+		workspace,
+		repository,
+		"pullrequests",
+		strconv.Itoa(pullRequestID),
+		"approve",
+	).String(), nil
 }

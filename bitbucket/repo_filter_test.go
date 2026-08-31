@@ -76,3 +76,23 @@ func TestBuildRepositoryPullRequestsURL(t *testing.T) {
 		t.Errorf("per-repository q unexpectedly contains project: %q", parsed.Query().Get("q"))
 	}
 }
+
+func TestBuildPullRequestApprovalURL(t *testing.T) {
+	t.Parallel()
+
+	raw, err := buildPullRequestApprovalURL("team", "repository", 42)
+	if err != nil {
+		t.Fatalf("buildPullRequestApprovalURL() error = %v", err)
+	}
+	parsed, err := url.Parse(raw)
+	if err != nil {
+		t.Fatalf("url.Parse() error = %v", err)
+	}
+	if parsed.Path != "/2.0/repositories/team/repository/pullrequests/42/approve" {
+		t.Errorf("buildPullRequestApprovalURL() path = %q", parsed.Path)
+	}
+
+	if _, err := buildPullRequestApprovalURL("team", "", 42); err == nil {
+		t.Error("buildPullRequestApprovalURL() accepted an empty repository")
+	}
+}

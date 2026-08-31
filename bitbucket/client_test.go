@@ -59,7 +59,7 @@ func TestGetAllPages(t *testing.T) {
 		t.Fatalf("getAllPages() error = %v", err)
 	}
 
-	want := []PullRequest{{Id: 1}, {Id: 2}, {Id: 3}}
+	want := []PullRequest{{ID: 1}, {ID: 2}, {ID: 3}}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("getAllPages() = %#v, want %#v", got, want)
 	}

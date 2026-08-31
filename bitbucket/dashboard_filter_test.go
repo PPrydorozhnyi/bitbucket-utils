@@ -2,7 +2,6 @@ package bitbucket
 
 import (
 	"net/url"
-	"reflect"
 	"testing"
 )
 
@@ -81,15 +80,21 @@ func TestBuildPullRequestFilter(t *testing.T) {
 	}
 }
 
-func TestBuildDashboardPullRequestQuery(t *testing.T) {
+func TestBuildPullRequestQuery(t *testing.T) {
 	t.Parallel()
 
-	got := buildDashboardPullRequestQuery(DashboardFilters{
-		States:  []string{"OPEN"},
-		Project: "{project-uuid}",
-		Query:   "jacoco",
-		Page:    3,
-	}, User{AccountID: "current-user"})
+	got := buildPullRequestQuery(
+		DashboardFilters{
+			States:  []string{"OPEN"},
+			Project: "{project-uuid}",
+			Query:   "jacoco",
+			Page:    3,
+		},
+		pullRequestQueryOptions{
+			IncludeProject:         true,
+			ExcludeAuthorAccountID: "current-user",
+		},
+	)
 
 	assertQueryValue(t, got, "pagelen", "50")
 	assertQueryValue(t, got, "page", "3")
@@ -137,39 +142,135 @@ func TestBuildPullRequestsByAuthorURL(t *testing.T) {
 	)
 }
 
-func TestFilterApprovablePRs(t *testing.T) {
+func TestMatchesDashboardFilters(t *testing.T) {
 	t.Parallel()
 
-	currentUser := User{AccountID: "current-user"}
-	prs := []PullRequest{
-		{Id: 1, Author: currentUser},
+	currentUser := User{AccountID: "current-user", UUID: "{current-uuid}"}
+	base := PullRequest{
+		ID:          1,
+		Title:       "Improve coverage",
+		Description: "Adds JaCoCo reporting",
+		State:       "OPEN",
+		Destination: Destination{
+			Repository: Repository{Project: Project{UUID: "{project-uuid}"}},
+		},
+		Reviewers: []User{
+			currentUser,
+			{AccountID: "selected-reviewer", UUID: "{reviewer-uuid}"},
+		},
+		Participants: []Participant{{User: currentUser}},
+	}
+
+	tests := []struct {
+		name    string
+		change  func(*PullRequest)
+		filters DashboardFilters
+		want    bool
+	}{
 		{
-			Id:           2,
-			Author:       User{AccountID: "other"},
-			Participants: []Participant{{User: currentUser, Approved: true}},
+			name:    "open",
+			filters: DashboardFilters{States: []string{"OPEN"}, UserFilter: "ALL"},
+			want:    true,
 		},
 		{
-			Id:           3,
-			Author:       User{AccountID: "other"},
-			Participants: []Participant{{User: currentUser}},
+			name:   "open excludes draft",
+			change: func(pr *PullRequest) { pr.Draft = true },
+			filters: DashboardFilters{
+				States:     []string{"OPEN"},
+				UserFilter: "ALL",
+			},
 		},
 		{
-			Id:     4,
-			Author: User{AccountID: "other"},
-			Participants: []Participant{{
-				User:     User{AccountID: "another-user"},
-				Approved: true,
-			}},
+			name:   "draft",
+			change: func(pr *PullRequest) { pr.Draft = true },
+			filters: DashboardFilters{
+				States:     []string{"DRAFT"},
+				UserFilter: "ALL",
+			},
+			want: true,
+		},
+		{
+			name:   "queued",
+			change: func(pr *PullRequest) { pr.Queued = true },
+			filters: DashboardFilters{
+				States:     []string{"QUEUED"},
+				UserFilter: "ALL",
+			},
+			want: true,
+		},
+		{
+			name:   "classic state",
+			change: func(pr *PullRequest) { pr.State = "MERGED" },
+			filters: DashboardFilters{
+				States:     []string{"MERGED"},
+				UserFilter: "ALL",
+			},
+			want: true,
+		},
+		{
+			name: "project mismatch",
+			filters: DashboardFilters{
+				States:     []string{"OPEN"},
+				Project:    "{other-project}",
+				UserFilter: "ALL",
+			},
+		},
+		{
+			name: "description query is case insensitive",
+			filters: DashboardFilters{
+				States:     []string{"OPEN"},
+				Query:      "JACOCO",
+				UserFilter: "ALL",
+			},
+			want: true,
+		},
+		{
+			name: "reviewer UUID",
+			filters: DashboardFilters{
+				States:     []string{"OPEN"},
+				Reviewer:   "{REVIEWER-UUID}",
+				UserFilter: "ALL",
+			},
+			want: true,
+		},
+		{
+			name: "reviewing",
+			filters: DashboardFilters{
+				States:     []string{"OPEN"},
+				UserFilter: "REVIEWING",
+			},
+			want: true,
+		},
+		{
+			name: "participating",
+			filters: DashboardFilters{
+				States:     []string{"OPEN"},
+				UserFilter: "PARTICIPATING",
+			},
+			want: true,
+		},
+		{
+			name: "query mismatch",
+			filters: DashboardFilters{
+				States:     []string{"OPEN"},
+				Query:      "unrelated",
+				UserFilter: "ALL",
+			},
 		},
 	}
 
-	got := filterApprovablePRs(prs, currentUser)
-	want := []PullRequest{prs[2], prs[3]}
-	if !reflect.DeepEqual(got, want) {
-		t.Errorf("filterApprovablePRs() = %#v, want %#v", got, want)
-	}
-	if len(prs) != 4 {
-		t.Errorf("filterApprovablePRs() mutated input length to %d", len(prs))
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			pr := base
+			if tt.change != nil {
+				tt.change(&pr)
+			}
+			if got := matchesDashboardFilters(pr, tt.filters, currentUser); got != tt.want {
+				t.Errorf("matchesDashboardFilters() = %t, want %t", got, tt.want)
+			}
+		})
 	}
 }
 

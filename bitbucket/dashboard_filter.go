@@ -11,7 +11,7 @@ const (
 	pullRequestPageLength = 50
 	pullRequestFields     = "next," +
 		"values.id,values.title,values.state,values.draft,values.queued," +
-		"values.links.html.href,values.links.approve.href,values.destination.repository.slug," +
+		"values.links.html.href,values.destination.repository.slug," +
 		"values.destination.repository.full_name,values.destination.repository.project.uuid," +
 		"values.reviewers.account_id,values.reviewers.uuid," +
 		"values.participants.user.account_id,values.participants.user.uuid," +
@@ -22,13 +22,6 @@ const (
 type pullRequestQueryOptions struct {
 	IncludeProject         bool
 	ExcludeAuthorAccountID string
-}
-
-func buildDashboardPullRequestQuery(filters DashboardFilters, currentUser User) url.Values {
-	return buildPullRequestQuery(filters, pullRequestQueryOptions{
-		IncludeProject:         true,
-		ExcludeAuthorAccountID: currentUser.AccountID,
-	})
 }
 
 func buildPullRequestQuery(filters DashboardFilters, options pullRequestQueryOptions) url.Values {
@@ -107,16 +100,76 @@ func buildStateFilter(states []string) string {
 	}
 }
 
-func filterApprovablePRs(prs []PullRequest, currentUser User) []PullRequest {
-	return slices.DeleteFunc(slices.Clone(prs), func(pr PullRequest) bool {
-		if pr.Author.AccountID == currentUser.AccountID {
-			return true
+func matchesDashboardFilters(pr PullRequest, filters DashboardFilters, currentUser User) bool {
+	if !matchesSelectedState(pr, filters.States) {
+		return false
+	}
+	if filters.Project != "" &&
+		!strings.EqualFold(pr.Destination.Repository.Project.UUID, filters.Project) {
+		return false
+	}
+	if filters.Query != "" {
+		query := strings.ToLower(filters.Query)
+		if !strings.Contains(strings.ToLower(pr.Title), query) &&
+			!strings.Contains(strings.ToLower(pr.Description), query) {
+			return false
 		}
-		return slices.ContainsFunc(pr.Participants, func(participant Participant) bool {
-			return participant.Approved &&
-				participant.User.AccountID == currentUser.AccountID
+	}
+	if filters.Reviewer != "" &&
+		!slices.ContainsFunc(pr.Reviewers, func(reviewer User) bool {
+			return userHasIdentity(reviewer, filters.Reviewer)
+		}) {
+		return false
+	}
+
+	switch filters.UserFilter {
+	case "", "ALL", "AUTHOR":
+		return true
+	case "REVIEWING":
+		return slices.ContainsFunc(pr.Reviewers, func(reviewer User) bool {
+			return sameUser(reviewer, currentUser)
 		})
+	case "PARTICIPATING":
+		return slices.ContainsFunc(pr.Participants, func(participant Participant) bool {
+			return sameUser(participant.User, currentUser)
+		})
+	default:
+		return false
+	}
+}
+
+func matchesSelectedState(pr PullRequest, states []string) bool {
+	if len(states) == 0 {
+		return true
+	}
+	return slices.ContainsFunc(states, func(state string) bool {
+		switch state {
+		case "OPEN":
+			return pr.State == "OPEN" && !pr.Draft && !pr.Queued
+		case "DRAFT":
+			return pr.State == "OPEN" && pr.Draft
+		case "QUEUED":
+			return pr.State == "OPEN" && pr.Queued
+		default:
+			return pr.State == state
+		}
 	})
+}
+
+func sameUser(left, right User) bool {
+	accountIDsMatch := left.AccountID != "" &&
+		right.AccountID != "" &&
+		left.AccountID == right.AccountID
+	UUIDsMatch := left.UUID != "" &&
+		right.UUID != "" &&
+		strings.EqualFold(left.UUID, right.UUID)
+	return accountIDsMatch || UUIDsMatch
+}
+
+func userHasIdentity(user User, identity string) bool {
+	accountIDMatches := user.AccountID == identity
+	UUIDMatches := user.UUID != "" && strings.EqualFold(user.UUID, identity)
+	return accountIDMatches || UUIDMatches
 }
 
 func quoteQueryValue(value string) string {
